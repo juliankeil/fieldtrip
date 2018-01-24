@@ -170,16 +170,21 @@ cfg.mri          = ft_getopt(cfg, 'mri',        []);
 cfg.outline      = ft_getopt(cfg, 'outline',    []); % default is handled below
 cfg.mask         = ft_getopt(cfg, 'mask',       []); % default is handled below
 
-if isempty(cfg.skipscale) && ischar(cfg.layout) && any(strcmp(cfg.layout, {'ordered', 'vertical', 'horizontal', 'butterfly', 'circular', '1column', '2column', '3column', '4column', '5column', '6column', '7column', '8column', '9column', '1row', '2row', '3row', '4row', '5row', '6row', '7row', '8row', '9row'}))
-  cfg.skipscale = 'yes'; 
-else
-  cfg.skipscale = 'no';
+if isempty(cfg.skipscale)
+  if ischar(cfg.layout) && any(strcmp(cfg.layout, {'ordered', 'vertical', 'horizontal', 'butterfly', 'circular', '1column', '2column', '3column', '4column', '5column', '6column', '7column', '8column', '9column', '1row', '2row', '3row', '4row', '5row', '6row', '7row', '8row', '9row'}))
+    cfg.skipscale = 'yes';
+  else
+    cfg.skipscale = 'no';
+  end
 end
 
-if isempty(cfg.skipcomnt) && ischar(cfg.layout) && any(strcmp(cfg.layout, {'ordered', 'vertical', 'horizontal', 'butterfly', 'circular', '1column', '2column', '3column', '4column', '5column', '6column', '7column', '8column', '9column', '1row', '2row', '3row', '4row', '5row', '6row', '7row', '8row', '9row'}))
-  cfg.skipcomnt = 'yes'; 
-else
-  cfg.skipcomnt = 'no';
+
+if isempty(cfg.skipcomnt)
+  if ischar(cfg.layout) && any(strcmp(cfg.layout, {'ordered', 'vertical', 'horizontal', 'butterfly', 'circular', '1column', '2column', '3column', '4column', '5column', '6column', '7column', '8column', '9column', '1row', '2row', '3row', '4row', '5row', '6row', '7row', '8row', '9row'}))
+    cfg.skipcomnt = 'yes';
+  else
+    cfg.skipcomnt = 'no';
+  end
 end
 
 if isempty(cfg.outline)
@@ -942,8 +947,12 @@ if (~isfield(layout, 'outline') || ~isfield(layout, 'mask')) && ~strcmpi(cfg.sty
     sel = setdiff(1:length(layout.label), [ind_scale ind_comnt]); % these are excluded for scaling
     x = layout.pos(sel,1);
     y = layout.pos(sel,2);
-    xrange = range(x);
-    yrange = range(y);
+    % the following would work even if all electrodes are offset and not centered around zero
+    % xrange = range(x);
+    % yrange = range(y);
+    % the following prevent topography distortion in case electrodes are not evenly distributed over the whole head
+    xrange = 2*( max(max(x),abs(min(x)) ));
+    yrange = 2*( max(max(y),abs(min(y)) ));
     if xrange==0
       xrange = 1;
     end
@@ -1386,16 +1395,15 @@ xy = [x; y];
 % the viewpoint and coordsys. See also ELPROJ and COORDSYS2LABEL
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 function pos = getorthoviewpos(pos, coordsys, viewpoint)
+% see also 
 
 if size(pos,2)~=3
   ft_error('XYZ coordinates are required to obtain the orthographic projections based on a viewpoint')
 end
 
-transmat = [];
-
 % create view(az,el) transformation matrix
 switch coordsys
-  case {'ras','tal','mni','spm','neuromag','itab'}
+  case {'ras' 'itab' 'neuromag' 'acpc' 'spm' 'mni' 'tal'}
     switch viewpoint
       case 'left'
         transmat = viewmtx(-90, 0);
@@ -1409,8 +1417,10 @@ switch coordsys
         transmat = viewmtx(0, 0);
       case 'anterior'
         transmat = viewmtx(180, 0);
+      otherwise
+        ft_error('orthographic projection using viewpoint "%s" is not supported', viewpoint)
     end % switch viewpoint
-  case {'als','ctf','4d','bti'}
+  case {'als' 'ctf' '4d' 'bti'}
     switch viewpoint
       case 'left'
         transmat = viewmtx(180, 0);
@@ -1424,12 +1434,13 @@ switch coordsys
         transmat = viewmtx(-90, 0);
       case 'anterior'
         transmat = viewmtx(90, 0);
+      otherwise
+        ft_error('orthographic projection using viewpoint "%s" is not supported', viewpoint)
     end % switch viewpoint
+  otherwise
+    ft_error('orthographic projection using coordinate system "%s" is not supported', coordsys)
 end % switch coordsys
 
-if isempty(transmat)
-  ft_error('orthographic projection using viewpoint "%s" is not supported for the "%s" coordinate system', viewpoint, coordsys)
-end
 
 % extract xy
 pos      = ft_warp_apply(transmat, pos, 'homogenous');
